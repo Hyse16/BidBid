@@ -58,4 +58,14 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
      */
     @Query("SELECT DISTINCT b.user FROM Bid b WHERE b.auctionItem.id = :auctionItemId")
     List<com.auction.domain.user.entity.User> findDistinctBiddersByAuctionItemId(Long auctionItemId);
+
+    /**
+     * 특정 사용자의 입찰 목록을 최신순으로 조회한다 (경매 상품 + 사용자 fetch join).
+     *
+     * 마이페이지 "내 입찰 목록"에서 사용한다.
+     * N+1 방지를 위해 auctionItem과 user를 fetch join으로 함께 로드한다.
+     * BidResponse.from()에서 bid.getUser().getNickname()과 bid.getAuctionItem().getId()를 모두 사용한다.
+     */
+    @Query("SELECT b FROM Bid b JOIN FETCH b.auctionItem JOIN FETCH b.user WHERE b.user.id = :userId ORDER BY b.createdAt DESC")
+    List<Bid> findByUserIdOrderByCreatedAtDesc(Long userId);
 }
