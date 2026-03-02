@@ -69,8 +69,9 @@ public class RedisConfig {
 
         // 캐시별 개별 TTL 설정
         Map<String, RedisCacheConfiguration> cacheConfigs = Map.of(
-                "auctions", defaultConfig.entryTtl(Duration.ofSeconds(30)), // 경매 목록: 30초
-                "auction",  defaultConfig.entryTtl(Duration.ofMinutes(5))   // 경매 단건:  5분
+                "auctions",   defaultConfig.entryTtl(Duration.ofSeconds(30)), // 경매 목록:  30초
+                "auction",    defaultConfig.entryTtl(Duration.ofMinutes(5)),  // 경매 단건:   5분
+                "categories", defaultConfig.entryTtl(Duration.ofHours(1))     // 카테고리:    1시간 (변경 빈도 낮음)
         );
 
         return RedisCacheManager.builder(connectionFactory)

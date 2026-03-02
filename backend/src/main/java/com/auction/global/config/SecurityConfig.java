@@ -49,6 +49,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()                     // 인증 API 공개
                         .requestMatchers(HttpMethod.GET, "/api/auctions/**").permitAll() // 경매 조회 공개
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll() // 카테고리 조회 공개
                         .requestMatchers("/ws/**").permitAll()                           // WebSocket 공개
                         .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll() // 모니터링 공개
                         .anyRequest().authenticated()                                    // 나머지는 인증 필요
