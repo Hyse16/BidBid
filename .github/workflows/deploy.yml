@@ -1,0 +1,176 @@
+name: CI/CD — Build & Deploy to AWS EC2
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 트리거: main 브랜치 push 시 자동 실행
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main
+
+# 동일 브랜치에서 이전 실행이 진행 중이면 취소
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION:    ap-northeast-2
+  ECR_REGISTRY:  ${{ secrets.ECR_REGISTRY }}
+  IMAGE_TAG:     ${{ github.sha }}
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 1: 백엔드 테스트 + Docker 이미지 빌드 & ECR 푸쉬
+  # ────────────────────────────────────────────────────────────────────────────
+  build-backend:
+    name: 백엔드 빌드 및 배포
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Java 17 설정
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Gradle 권한 설정
+        run: chmod +x backend/gradlew
+
+      # 테스트 실행 (H2 인메모리 DB 사용)
+      - name: 백엔드 단위 테스트
+        working-directory: backend
+        run: ./gradlew test --no-daemon -q
+
+      # AWS 자격증명 설정
+      - name: AWS 자격증명 구성
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      # ECR 로그인
+      - name: Amazon ECR 로그인
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Docker 이미지 빌드 & ECR 푸쉬
+      - name: 백엔드 Docker 이미지 빌드 & 푸쉬
+        working-directory: backend
+        run: |
+          IMAGE_URI=${{ env.ECR_REGISTRY }}/bidbid-backend:${{ env.IMAGE_TAG }}
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+
+          # latest 태그도 함께 업데이트
+          docker tag $IMAGE_URI ${{ env.ECR_REGISTRY }}/bidbid-backend:latest
+          docker push ${{ env.ECR_REGISTRY }}/bidbid-backend:latest
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 2: 프론트엔드 Docker 이미지 빌드 & ECR 푸쉬
+  # ────────────────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: 프론트엔드 빌드 및 배포
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AWS 자격증명 구성
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Amazon ECR 로그인
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 프론트엔드 Docker 이미지 빌드 & 푸쉬
+        working-directory: frontend
+        run: |
+          IMAGE_URI=${{ env.ECR_REGISTRY }}/bidbid-frontend:${{ env.IMAGE_TAG }}
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            --build-arg NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }} \
+            -t $IMAGE_URI .
+          docker push $IMAGE_URI
+
+          docker tag $IMAGE_URI ${{ env.ECR_REGISTRY }}/bidbid-frontend:latest
+          docker push ${{ env.ECR_REGISTRY }}/bidbid-frontend:latest
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 3: EC2에 SSH 접속 → 컨테이너 업데이트
+  # ── build-backend, build-frontend 모두 완료 후 실행
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: EC2 배포
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+
+    steps:
+      - name: EC2 SSH 접속 및 배포
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # ECR 로그인
+            aws ecr get-login-password --region ap-northeast-2 \
+              | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+
+            # 최신 이미지 Pull
+            docker pull ${{ env.ECR_REGISTRY }}/bidbid-backend:${{ env.IMAGE_TAG }}
+            docker pull ${{ env.ECR_REGISTRY }}/bidbid-frontend:${{ env.IMAGE_TAG }}
+
+            # 환경 변수 설정 후 컨테이너 재시작
+            cd ~/bidbid
+            export IMAGE_TAG=${{ env.IMAGE_TAG }}
+            export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
+            docker-compose -f docker-compose.prod.yml up -d --no-build backend frontend
+
+            # 헬스체크 대기 (최대 60초)
+            echo "헬스체크 대기 중..."
+            for i in $(seq 1 12); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' auction-backend 2>/dev/null)
+              if [ "$STATUS" = "healthy" ]; then
+                echo "백엔드 정상 기동 확인"
+                break
+              fi
+              echo "  대기 중... ($i/12)"
+              sleep 5
+            done
+
+            # 사용하지 않는 이미지 정리
+            docker image prune -f
+
+      # 배포 결과를 텔레그램으로 알림
+      - name: 배포 성공 알림
+        if: success()
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to:      ${{ secrets.TELEGRAM_CHAT_ID }}
+          token:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ✅ BidBid 배포 완료
+            브랜치: ${{ github.ref_name }}
+            커밋: ${{ github.sha }}
+            배포자: ${{ github.actor }}
+
+      - name: 배포 실패 알림
+        if: failure()
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to:    ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ BidBid 배포 실패
+            브랜치: ${{ github.ref_name }}
+            커밋: ${{ github.sha }}
+            Actions URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

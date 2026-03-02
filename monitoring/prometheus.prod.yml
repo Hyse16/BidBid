@@ -1,0 +1,26 @@
+global:
+  scrape_interval:     15s   # 메트릭 수집 주기
+  evaluation_interval: 15s   # 규칙 평가 주기
+
+scrape_configs:
+  # ── Spring Boot Actuator (백엔드 애플리케이션) ──────────────────────────────
+  - job_name: 'auction-backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['backend:8080']
+    # 주요 메트릭:
+    #   http_server_requests_seconds_* : API 응답 시간 (p50/p95/p99)
+    #   jvm_memory_used_bytes           : JVM 힙 메모리 사용량
+    #   jvm_gc_pause_seconds_*          : GC 중단 시간
+    #   hikaricp_connections_*          : DB 커넥션 풀 상태
+    #   redis_commands_duration_seconds : Redis 명령 응답 시간
+
+  # ── Prometheus 자체 메트릭 ─────────────────────────────────────────────────
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ── Nginx 메트릭 (nginx-prometheus-exporter 사용 시) ────────────────────────
+  # - job_name: 'nginx'
+  #   static_configs:
+  #     - targets: ['nginx-exporter:9113']
