@@ -71,6 +71,31 @@ public class AuctionItemRepositoryImpl implements AuctionItemRepositoryCustom {
         return new PageImpl<>(content, pageable, total == null ? 0 : total);
     }
 
+    @Override
+    public List<AuctionListResponse> findByUserIdOrderByCreatedAtDesc(Long userId) {
+        QAuctionItem  qItem     = QAuctionItem.auctionItem;
+        QAuctionImage qImage    = QAuctionImage.auctionImage;
+        QCategory     qCategory = QCategory.category;
+
+        // 사용자 ID 조건으로 내 경매 목록 조회 (썸네일 포함)
+        return queryFactory
+                .select(Projections.constructor(AuctionListResponse.class,
+                        qItem.id,
+                        qItem.title,
+                        qItem.currentPrice,
+                        qItem.buyNowPrice,
+                        qItem.status.stringValue(),
+                        qItem.endAt,
+                        qCategory.name,
+                        qImage.imageUrl))
+                .from(qItem)
+                .join(qItem.category, qCategory)
+                .leftJoin(qItem.images, qImage).on(qImage.isThumbnail.isTrue())
+                .where(qItem.user.id.eq(userId))
+                .orderBy(qItem.createdAt.desc())
+                .fetch();
+    }
+
     /** 검색 조건을 동적으로 조합한다 (null 조건은 자동 스킵) */
     private BooleanBuilder buildCondition(AuctionSearchCondition condition, QAuctionItem qItem) {
         BooleanBuilder builder = new BooleanBuilder();

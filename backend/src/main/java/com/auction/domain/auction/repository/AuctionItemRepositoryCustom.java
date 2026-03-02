@@ -5,6 +5,8 @@ import com.auction.domain.auction.dto.AuctionSearchCondition;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 /**
  * QueryDSL 커스텀 레포지토리 인터페이스
  *
@@ -24,4 +26,14 @@ public interface AuctionItemRepositoryCustom {
      * @return 목록용 경매 응답 페이지
      */
     Page<AuctionListResponse> searchAuctions(AuctionSearchCondition condition, Pageable pageable);
+
+    /**
+     * 특정 사용자가 등록한 경매 목록을 최신순으로 조회한다 (썸네일 포함).
+     *
+     * 마이페이지 "내 경매 목록"에서 사용한다.
+     *
+     * @param userId 조회 대상 사용자 ID
+     * @return 목록용 경매 응답 리스트
+     */
+    List<AuctionListResponse> findByUserIdOrderByCreatedAtDesc(Long userId);
 }
