@@ -4,6 +4,7 @@ import com.auction.domain.auction.dto.*;
 import com.auction.domain.auction.entity.AuctionImage;
 import com.auction.domain.auction.entity.AuctionItem;
 import com.auction.domain.auction.repository.AuctionItemRepository;
+import com.auction.domain.bid.repository.BidRepository;
 import com.auction.domain.category.entity.Category;
 import com.auction.domain.category.repository.CategoryRepository;
 import com.auction.domain.user.entity.User;
@@ -48,6 +49,7 @@ public class AuctionService {
     // ── 주입 필드 ─────────────────────────────────────────────────────────────────
     private final AuctionItemRepository auctionItemRepository;
     private final CategoryRepository    categoryRepository;
+    private final BidRepository         bidRepository;
     private final S3Service             s3Service;
 
     private static final String S3_DIRECTORY = "auction-images"; // S3 저장 경로
@@ -217,14 +219,9 @@ public class AuctionService {
         }
     }
 
-    /**
-     * 입찰 기록이 있는지 확인한다.
-     *
-     * currentPrice가 startPrice보다 높으면 입찰이 있다고 판단한다.
-     * Step 4에서 BidRepository.existsByAuctionItemId(item.getId())로 교체 예정.
-     */
+    /** 경매 상품에 입찰 기록이 있는지 확인한다 */
     private boolean hasBids(AuctionItem item) {
-        return item.getCurrentPrice() > item.getStartPrice();
+        return bidRepository.existsByAuctionItemId(item.getId());
     }
 
     /** 이미지를 S3에 업로드하고 AuctionItem에 연결한다 (첫 번째 이미지 = 썸네일) */
