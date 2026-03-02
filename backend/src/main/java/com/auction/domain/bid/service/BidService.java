@@ -12,8 +12,8 @@ import com.auction.domain.bid.repository.BidRepository;
 import com.auction.domain.user.entity.User;
 import com.auction.global.exception.CustomException;
 import com.auction.global.exception.ErrorCode;
+import com.auction.domain.notification.service.NotificationService;
 import com.auction.infra.redis.RedissonLockService;
-import com.auction.infra.telegram.TelegramService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -59,8 +59,8 @@ public class BidService {
     private final BidRepository         bidRepository;
     private final AuctionItemRepository auctionItemRepository;
     private final RedissonLockService   redissonLockService;
-    private final SimpMessagingTemplate messagingTemplate;  // WebSocket 브로드캐스트
-    private final TelegramService       telegramService;
+    private final SimpMessagingTemplate messagingTemplate;   // WebSocket 브로드캐스트
+    private final NotificationService   notificationService; // DB 저장 + 텔레그램 전송
 
     private static final String LOCK_KEY_PREFIX = "auction:bid:"; // 분산 락 키 접두사
 
@@ -132,8 +132,8 @@ public class BidService {
         // WebSocket 실시간 브로드캐스트
         broadcastBidUpdate(item.getId(), request.bidPrice(), bidder.getNickname());
 
-        // 텔레그램 알림 (비동기 — 메인 스레드 차단 없음)
-        sendTelegramNotifications(item, bidder, outbidUser, request.bidPrice());
+        // 알림 전송: DB 기록 + 텔레그램 (비동기 — 메인 스레드 차단 없음)
+        sendNotifications(item, bidder, outbidUser, request.bidPrice());
 
         return BidResponse.from(newBid);
     }
@@ -206,27 +206,16 @@ public class BidService {
     }
 
     /**
-     * 관련 사용자들에게 텔레그램 알림을 비동기로 전송한다.
+     * NotificationService를 통해 알림을 전송한다 (DB 기록 + 텔레그램).
      *
-     * 새 입찰자    : 📈 New bid registered on [item]! Current price: {price}원
-     * 밀려난 입찰자: ⚠️ You've been outbid on [item]! Current: {price}원
+     * 새 입찰자    : 📈 BID 알림
+     * 밀려난 입찰자: ⚠️ OUTBID 알림 (최초 입찰이면 outbidUser == null, 생략)
      */
-    private void sendTelegramNotifications(AuctionItem item, User bidder, User outbidUser, Long bidPrice) {
-        String title         = item.getTitle();
-        String priceFormatted = String.format("%,d원", bidPrice);
+    private void sendNotifications(AuctionItem item, User bidder, User outbidUser, Long bidPrice) {
+        notificationService.sendBidNotification(bidder.getId(), item.getTitle(), bidPrice);
 
-        // 새 입찰자에게 알림
-        telegramService.sendMessage(
-                bidder.getTelegramChatId(),
-                String.format("📈 New bid registered on <b>%s</b>! Current price: <b>%s</b>", title, priceFormatted)
-        );
-
-        // 밀려난 입찰자에게 알림 (최초 입찰이면 outbidUser == null)
         if (outbidUser != null) {
-            telegramService.sendMessage(
-                    outbidUser.getTelegramChatId(),
-                    String.format("⚠️ You've been outbid on <b>%s</b>! Current: <b>%s</b>", title, priceFormatted)
-            );
+            notificationService.sendOutbidNotification(outbidUser.getId(), item.getTitle(), bidPrice);
         }
     }
 }
