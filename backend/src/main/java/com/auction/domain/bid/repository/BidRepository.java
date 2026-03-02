@@ -41,4 +41,21 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
      * AuctionService.hasBids()에서 경매 수정 가능 여부를 판단할 때 사용한다.
      */
     boolean existsByAuctionItemId(Long auctionItemId);
+
+    /**
+     * 특정 경매의 고유 입찰자 목록을 조회한다 (특정 사용자 제외).
+     *
+     * 경매 종료 시 낙찰자를 제외한 나머지 입찰자에게 LOSE 알림을 전송할 때 사용한다.
+     */
+    @Query("SELECT DISTINCT b.user FROM Bid b WHERE b.auctionItem.id = :auctionItemId AND b.user.id <> :excludeUserId")
+    List<com.auction.domain.user.entity.User> findDistinctBiddersByAuctionItemIdExcluding(
+            Long auctionItemId, Long excludeUserId);
+
+    /**
+     * 특정 경매의 고유 입찰자 목록을 조회한다 (전체).
+     *
+     * 만료 임박 알림 스케줄러에서 해당 경매 입찰자들에게 EXPIRY_WARNING을 전송할 때 사용한다.
+     */
+    @Query("SELECT DISTINCT b.user FROM Bid b WHERE b.auctionItem.id = :auctionItemId")
+    List<com.auction.domain.user.entity.User> findDistinctBiddersByAuctionItemId(Long auctionItemId);
 }

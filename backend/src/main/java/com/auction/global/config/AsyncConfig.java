@@ -3,6 +3,7 @@ package com.auction.global.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
@@ -21,6 +22,7 @@ import java.util.concurrent.Executor;
  */
 @Configuration
 @EnableAsync
+@EnableScheduling // 경매 종료 처리 + 만료 임박 알림 스케줄러 활성화
 public class AsyncConfig {
 
     @Bean(name = "asyncExecutor")
