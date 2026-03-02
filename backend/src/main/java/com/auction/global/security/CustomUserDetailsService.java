@@ -52,4 +52,15 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .authorities(List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())))
                 .build();
     }
+
+    /**
+     * 이메일로 도메인 User 엔티티를 직접 조회한다.
+     *
+     * 컨트롤러에서 @AuthenticationPrincipal UserDetails → User 엔티티 변환 시 사용한다.
+     * UserDetails는 Spring Security 객체이므로 도메인 로직에 사용하려면 엔티티 변환이 필요하다.
+     */
+    public com.auction.domain.user.entity.User loadUserEntityByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
 }
