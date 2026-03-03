@@ -44,27 +44,31 @@ export default function AuctionsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">경매 목록</h1>
+      {/* 페이지 헤더 */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-100 tracking-tight">
+          경매 목록
+          <span className="text-[#d4af37] ml-1">.</span>
+        </h1>
+        <p className="text-gray-600 text-sm mt-1">실시간으로 진행 중인 경매에 참여하세요</p>
+      </div>
 
       {/* 필터 영역 */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        {/* 카테고리 필터 */}
+      <div className="flex flex-wrap gap-3 mb-8 p-4 bg-[#12121f] rounded-xl
+                      border border-[rgba(212,175,55,0.1)]">
         <select
-          className="input-field w-auto"
+          className="input-field w-auto bg-[#0f0f0f]"
           value={params.categoryId ?? ""}
           onChange={(e) => updateFilter("categoryId", e.target.value ? Number(e.target.value) : undefined)}
         >
           <option value="">전체 카테고리</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
 
-        {/* 상태 필터 */}
         <select
-          className="input-field w-auto"
+          className="input-field w-auto bg-[#0f0f0f]"
           value={params.status ?? ""}
           onChange={(e) => updateFilter("status", e.target.value || undefined)}
         >
@@ -74,10 +78,9 @@ export default function AuctionsPage() {
           <option value="ENDED">종료</option>
         </select>
 
-        {/* 키워드 검색 */}
         <input
           type="text"
-          className="input-field w-auto"
+          className="input-field w-auto bg-[#0f0f0f]"
           placeholder="키워드 검색"
           defaultValue={params.keyword ?? ""}
           onKeyDown={(e) => {
@@ -90,12 +93,12 @@ export default function AuctionsPage() {
 
       {/* 경매 목록 */}
       {isLoading ? (
-        <div className="py-20">
+        <div className="py-20 flex justify-center">
           <LoadingSpinner size="lg" />
         </div>
       ) : auctions && auctions.content.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {auctions.content.map((auction) => (
               <AuctionCard key={auction.id} auction={auction} />
             ))}
@@ -103,31 +106,35 @@ export default function AuctionsPage() {
 
           {/* 페이징 */}
           {auctions.totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-8">
+            <div className="flex justify-center items-center gap-3 mt-10">
               <button
-                className="btn-secondary px-3 py-1 text-sm"
+                className="btn-secondary px-4 py-1.5 text-sm"
                 disabled={params.page === 0}
                 onClick={() => setParams((p) => ({ ...p, page: (p.page ?? 1) - 1 }))}
               >
-                이전
+                ← 이전
               </button>
-              <span className="py-1 px-3 text-sm text-gray-600">
+              <span className="py-1 px-4 text-sm text-[#d4af37] font-medium
+                               bg-[rgba(212,175,55,0.08)] rounded-lg
+                               border border-[rgba(212,175,55,0.2)]">
                 {(params.page ?? 0) + 1} / {auctions.totalPages}
               </span>
               <button
-                className="btn-secondary px-3 py-1 text-sm"
+                className="btn-secondary px-4 py-1.5 text-sm"
                 disabled={(params.page ?? 0) >= auctions.totalPages - 1}
                 onClick={() => setParams((p) => ({ ...p, page: (p.page ?? 0) + 1 }))}
               >
-                다음
+                다음 →
               </button>
             </div>
           )}
         </>
       ) : (
-        <div className="text-center py-20 text-gray-500">
-          <p className="text-lg">경매 상품이 없습니다</p>
-          <p className="text-sm mt-1">검색 조건을 변경하거나 새 경매를 등록해 보세요</p>
+        <div className="text-center py-24 bg-[#12121f] rounded-xl
+                        border border-[rgba(212,175,55,0.08)]">
+          <p className="text-2xl text-gray-700 mb-2">🔨</p>
+          <p className="text-gray-500">경매 상품이 없습니다</p>
+          <p className="text-sm text-gray-700 mt-1">검색 조건을 변경하거나 새 경매를 등록해 보세요</p>
         </div>
       )}
     </div>

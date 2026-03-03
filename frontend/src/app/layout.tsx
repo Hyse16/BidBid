@@ -20,13 +20,15 @@ export default function RootLayout({
     <html lang="ko">
       <body className={inter.className}>
         <QueryProvider>
-          <div className="min-h-screen flex flex-col bg-gray-50">
+          <div className="min-h-screen flex flex-col bg-[#0f0f0f]">
             <Header />
-            <main className="flex-1 container mx-auto px-4 py-6 max-w-6xl">
+            <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
               {children}
             </main>
-            <footer className="bg-white border-t py-6 text-center text-sm text-gray-500">
-              © 2024 BidBid. 실시간 경매 플랫폼
+            <footer className="bg-[#0a0a0a] border-t border-[rgba(212,175,55,0.15)] py-6 text-center text-sm text-gray-600">
+              © 2024{" "}
+              <span className="text-[#d4af37] font-semibold tracking-widest">BidBid</span>
+              {" "}— 실시간 경매 플랫폼
             </footer>
           </div>
         </QueryProvider>
