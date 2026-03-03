@@ -42,7 +42,7 @@ public class WatchlistController {
             @PathVariable Long auctionId) {
         User user = resolveUser(userDetails);
         watchlistService.addToWatchlist(user.getId(), auctionId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(null));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(null));
     }
 
     /** DELETE /api/watchlist/{auctionId} — 관심 목록 제거 */
@@ -52,7 +52,7 @@ public class WatchlistController {
             @PathVariable Long auctionId) {
         User user = resolveUser(userDetails);
         watchlistService.removeFromWatchlist(user.getId(), auctionId);
-        return ResponseEntity.ok(ApiResponse.success(null));
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
     // ── 내 관심 목록 조회 ─────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ public class WatchlistController {
     public ResponseEntity<ApiResponse<List<WatchlistResponse>>> getMyWatchlist(
             @AuthenticationPrincipal UserDetails userDetails) {
         User user = resolveUser(userDetails);
-        return ResponseEntity.ok(ApiResponse.success(watchlistService.getMyWatchlist(user.getId())));
+        return ResponseEntity.ok(ApiResponse.ok(watchlistService.getMyWatchlist(user.getId())));
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────────
