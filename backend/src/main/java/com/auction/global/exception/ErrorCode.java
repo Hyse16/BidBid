@@ -56,6 +56,9 @@ public enum ErrorCode {
     WATCHLIST_ALREADY_EXISTS(HttpStatus.CONFLICT, "Item is already in your watchlist"),  // 이미 관심 목록에 추가됨
     WATCHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "Watchlist entry not found"),             // 관심 목록 항목 없음
 
+    // ── 알림 ─────────────────────────────────────────────────────────────────────
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Notification not found"),             // 알림 없음
+
     // ── 파일 / S3 ─────────────────────────────────────────────────────────────────
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "File upload failed"),  // S3 업로드 실패
     FILE_TYPE_INVALID(HttpStatus.BAD_REQUEST, "Invalid file type"),              // 허용되지 않은 파일 타입

@@ -1,16 +1,21 @@
 package com.auction.domain.notification.service;
 
+import com.auction.domain.notification.dto.NotificationResponse;
 import com.auction.domain.notification.entity.Notification;
 import com.auction.domain.notification.entity.NotificationType;
 import com.auction.domain.notification.repository.NotificationRepository;
 import com.auction.domain.user.entity.User;
 import com.auction.domain.user.repository.UserRepository;
+import com.auction.global.exception.CustomException;
+import com.auction.global.exception.ErrorCode;
 import com.auction.infra.telegram.TelegramService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * 알림 서비스
@@ -39,6 +44,79 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository         userRepository;
     private final TelegramService        telegramService;
+
+    // ── 알림함 조회 메서드 ────────────────────────────────────────────────────────
+
+    /**
+     * 사용자의 전체 알림 목록을 최신순으로 반환한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @return 알림 응답 DTO 목록
+     */
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getNotifications(Long userId) {
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(NotificationResponse::from)
+                .toList();
+    }
+
+    /**
+     * 사용자의 읽지 않은 알림 수를 반환한다.
+     *
+     * 프론트엔드 알림 배지(뱃지) 카운트에 사용한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @return 읽지 않은 알림 수
+     */
+    @Transactional(readOnly = true)
+    public long getUnreadCount(Long userId) {
+        return notificationRepository.countByUserIdAndIsReadFalse(userId);
+    }
+
+    /**
+     * 단일 알림을 읽음 처리한다.
+     *
+     * 본인의 알림만 읽음 처리 가능하다.
+     * (findByIdAndUserId로 소유자 검증을 겸한다)
+     *
+     * @param notificationId 읽음 처리할 알림 ID
+     * @param userId         요청한 사용자 ID
+     */
+    @Transactional
+    public void markAsRead(Long notificationId, Long userId) {
+        Notification notification = notificationRepository.findByIdAndUserId(notificationId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOTIFICATION_NOT_FOUND));
+
+        notification.markAsRead();
+    }
+
+    /**
+     * 모든 알림을 일괄 읽음 처리한다.
+     *
+     * @param userId 요청한 사용자 ID
+     */
+    @Transactional
+    public void markAllAsRead(Long userId) {
+        notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                .forEach(Notification::markAsRead);
+    }
+
+    /**
+     * 단일 알림을 삭제한다.
+     *
+     * 본인의 알림만 삭제 가능하다.
+     *
+     * @param notificationId 삭제할 알림 ID
+     * @param userId         요청한 사용자 ID
+     */
+    @Transactional
+    public void deleteNotification(Long notificationId, Long userId) {
+        Notification notification = notificationRepository.findByIdAndUserId(notificationId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOTIFICATION_NOT_FOUND));
+
+        notificationRepository.delete(notification);
+    }
 
     // ── 알림 전송 메서드 (유형별) ─────────────────────────────────────────────────
 

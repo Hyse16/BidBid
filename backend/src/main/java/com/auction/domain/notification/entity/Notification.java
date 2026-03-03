@@ -45,8 +45,17 @@ public class Notification extends BaseEntity {
     @Builder.Default
     private Boolean isSent = false; // 텔레그램 전송 성공 여부
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isRead = false; // 사용자 읽음 여부 (알림함 확인)
+
     /** 텔레그램 전송 성공 시 호출하여 전송 상태를 갱신한다 */
     public void markAsSent() {
         this.isSent = true;
+    }
+
+    /** 사용자가 알림을 읽었을 때 호출한다 */
+    public void markAsRead() {
+        this.isRead = true;
     }
 }
