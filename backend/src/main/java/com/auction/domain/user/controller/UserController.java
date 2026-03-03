@@ -44,7 +44,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> getMyProfile(
             @AuthenticationPrincipal UserDetails userDetails) {
         User user = resolveUser(userDetails);
-        return ResponseEntity.ok(ApiResponse.success(userService.getMyProfile(user.getId())));
+        return ResponseEntity.ok(ApiResponse.ok(userService.getMyProfile(user.getId())));
     }
 
     /** PUT /api/users/me — 내 프로필 수정 */
@@ -53,7 +53,7 @@ public class UserController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody UserUpdateRequest request) {
         User user = resolveUser(userDetails);
-        return ResponseEntity.ok(ApiResponse.success(userService.updateMyProfile(user.getId(), request)));
+        return ResponseEntity.ok(ApiResponse.ok(userService.updateMyProfile(user.getId(), request)));
     }
 
     // ── 내 경매 / 입찰 목록 ────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<List<AuctionListResponse>>> getMyAuctions(
             @AuthenticationPrincipal UserDetails userDetails) {
         User user = resolveUser(userDetails);
-        return ResponseEntity.ok(ApiResponse.success(userService.getMyAuctions(user.getId())));
+        return ResponseEntity.ok(ApiResponse.ok(userService.getMyAuctions(user.getId())));
     }
 
     /** GET /api/users/me/bids — 내가 입찰한 경매 목록 */
@@ -71,7 +71,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<List<BidResponse>>> getMyBids(
             @AuthenticationPrincipal UserDetails userDetails) {
         User user = resolveUser(userDetails);
-        return ResponseEntity.ok(ApiResponse.success(userService.getMyBids(user.getId())));
+        return ResponseEntity.ok(ApiResponse.ok(userService.getMyBids(user.getId())));
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────────

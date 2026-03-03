@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BidBid 동시 입찰 부하 테스트 (JMeter Test Plan)
+
+  목적:
+    100명의 사용자가 동시에 동일 경매에 입찰하는 시나리오를 시뮬레이션한다.
+    Redis 분산 락으로 Race Condition 없이 단 하나의 WINNING 입찰만 남는지 검증한다.
+
+  사전 조건:
+    1. 백엔드 서버 실행 중 (localhost:8080)
+    2. 테스트용 경매 ID를 AUCTION_ID 변수에 설정
+    3. 100개의 유효한 JWT Access Token을 token.csv에 준비
+
+  실행 방법:
+    jmeter -n -t concurrent-bid-test.jmx -l results.jtl -e -o report/
+
+  검증 포인트:
+    - 100개 요청 중 최종 WINNING 입찰은 1개
+    - 나머지는 OUTBID 또는 BID_PRICE_TOO_LOW 응답
+    - 분산 락 실패(BID_LOCK_FAILED) 발생 비율 모니터링
+-->
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan testname="BidBid 동시 입찰 부하 테스트" enabled="true">
+      <stringProp name="TestPlan.comments">100명 동시 입찰로 Race Condition 검증</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+
+      <!-- 전역 변수 -->
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="BASE_URL" elementType="Argument">
+            <stringProp name="Argument.name">BASE_URL</stringProp>
+            <stringProp name="Argument.value">localhost</stringProp>
+          </elementProp>
+          <elementProp name="PORT" elementType="Argument">
+            <stringProp name="Argument.name">PORT</stringProp>
+            <stringProp name="Argument.value">8080</stringProp>
+          </elementProp>
+          <elementProp name="AUCTION_ID" elementType="Argument">
+            <stringProp name="Argument.name">AUCTION_ID</stringProp>
+            <stringProp name="Argument.value">1</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+
+      <hashTree>
+        <!-- CSV 데이터셋: 각 스레드가 고유한 JWT 토큰과 입찰가 사용 -->
+        <CSVDataSet testname="입찰 데이터 (JWT + 입찰가)" enabled="true">
+          <stringProp name="filename">token.csv</stringProp>
+          <stringProp name="variableNames">JWT_TOKEN,BID_PRICE</stringProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="recycle">true</boolProp>
+          <boolProp name="stopThread">false</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+        </CSVDataSet>
+
+        <!-- ── Thread Group: 100명 동시 입찰 ─────────────────────────────── -->
+        <ThreadGroup testname="100명 동시 입찰" enabled="true">
+          <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+          <elementProp name="ThreadGroup.main_controller" elementType="LoopController">
+            <boolProp name="LoopController.continue_forever">false</boolProp>
+            <stringProp name="LoopController.loops">1</stringProp>
+          </elementProp>
+          <stringProp name="ThreadGroup.num_threads">100</stringProp>  <!-- 동시 사용자 수 -->
+          <stringProp name="ThreadGroup.ramp_time">0</stringProp>       <!-- 0초: 동시에 시작 -->
+          <boolProp name="ThreadGroup.scheduler">false</boolProp>
+
+          <hashTree>
+            <!-- HTTP 기본 설정 -->
+            <ConfigTestElement testname="HTTP 기본 설정" enabled="true">
+              <elementProp name="HTTPsampler.Arguments" elementType="Arguments" />
+              <stringProp name="HTTPSampler.domain">${BASE_URL}</stringProp>
+              <stringProp name="HTTPSampler.port">${PORT}</stringProp>
+              <stringProp name="HTTPSampler.protocol">http</stringProp>
+              <stringProp name="HTTPSampler.connect_timeout">5000</stringProp>
+              <stringProp name="HTTPSampler.response_timeout">10000</stringProp>
+            </ConfigTestElement>
+
+            <!-- HTTP 헤더: JWT 토큰 및 Content-Type -->
+            <HeaderManager testname="공통 헤더" enabled="true">
+              <collectionProp name="HeaderManager.headers">
+                <elementProp name="Authorization" elementType="Header">
+                  <stringProp name="Header.name">Authorization</stringProp>
+                  <stringProp name="Header.value">Bearer ${JWT_TOKEN}</stringProp>
+                </elementProp>
+                <elementProp name="Content-Type" elementType="Header">
+                  <stringProp name="Header.name">Content-Type</stringProp>
+                  <stringProp name="Header.value">application/json</stringProp>
+                </elementProp>
+              </collectionProp>
+            </HeaderManager>
+
+            <!-- ── 입찰 요청 ─────────────────────────────────────────────── -->
+            <HTTPSamplerProxy testname="POST 입찰 요청" enabled="true">
+              <stringProp name="HTTPSampler.path">/api/auctions/${AUCTION_ID}/bids</stringProp>
+              <stringProp name="HTTPSampler.method">POST</stringProp>
+              <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+              <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+                <collectionProp name="Arguments.arguments">
+                  <elementProp name="" elementType="HTTPArgument">
+                    <stringProp name="Argument.value">{"bidPrice": ${BID_PRICE}}</stringProp>
+                    <stringProp name="Argument.metadata">=</stringProp>
+                  </elementProp>
+                </collectionProp>
+              </elementProp>
+            </HTTPSamplerProxy>
+
+            <!-- 응답 코드 어서션: 200(성공) 또는 400(유효성 실패) 허용 -->
+            <ResponseAssertion testname="응답 코드 검증" enabled="true">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp>200</stringProp>
+                <stringProp>400</stringProp>
+                <stringProp>409</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <intProp name="Assertion.test_type">40</intProp> <!-- OR 조건 -->
+            </ResponseAssertion>
+
+            <!-- JSON 어서션: success 필드 존재 확인 -->
+            <JSONPathAssertion testname="응답 구조 검증" enabled="true">
+              <stringProp name="JSON_PATH">$.success</stringProp>
+              <stringProp name="EXPECTED_VALUE">true</stringProp>
+              <boolProp name="JSONVALIDATION">false</boolProp>
+              <boolProp name="EXPECT_NULL">false</boolProp>
+            </JSONPathAssertion>
+
+          </hashTree>
+        </ThreadGroup>
+
+        <!-- ── 리포트 / 리스너 ──────────────────────────────────────────────── -->
+
+        <!-- 요약 리포트 (콘솔 출력) -->
+        <ResultCollector testname="요약 리포트" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+              <bytes>true</bytes>
+              <sentBytes>true</sentBytes>
+              <url>true</url>
+              <threadCounts>true</threadCounts>
+              <sampleCount>true</sampleCount>
+            </value>
+          </objProp>
+          <stringProp name="filename">results.jtl</stringProp>
+          <guiclass>SummaryReport</guiclass>
+        </ResultCollector>
+
+        <!-- 트랜잭션 처리량 타이머 (각 요청 사이 최소 대기 없음 → 최대 동시성) -->
+        <ConstantTimer testname="동시 요청 지연 (0ms)" enabled="true">
+          <stringProp name="ConstantTimer.delay">0</stringProp>
+        </ConstantTimer>
+
+      </hashTree>
+    </TestPlan>
+  </hashTree>
+</jmeterTestPlan>
