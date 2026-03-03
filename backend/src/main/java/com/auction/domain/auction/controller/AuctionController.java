@@ -66,6 +66,19 @@ public class AuctionController {
         return ResponseEntity.ok(ApiResponse.ok(auctionService.getAuction(id)));
     }
 
+    /**
+     * 경매 낙찰 결과 조회
+     *
+     * GET /api/auctions/{id}/result
+     *
+     * 낙찰자가 있으면 AuctionResultResponse를 반환하고,
+     * 유찰(입찰 없이 종료)이면 data=null로 응답한다.
+     */
+    @GetMapping("/{id}/result")
+    public ResponseEntity<ApiResponse<AuctionResultResponse>> getAuctionResult(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(auctionService.getAuctionResult(id)));
+    }
+
     // ── 인증 필요 API ─────────────────────────────────────────────────────────────
 
     /**

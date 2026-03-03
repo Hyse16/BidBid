@@ -3,7 +3,9 @@ package com.auction.domain.auction.service;
 import com.auction.domain.auction.dto.*;
 import com.auction.domain.auction.entity.AuctionImage;
 import com.auction.domain.auction.entity.AuctionItem;
+import com.auction.domain.auction.entity.AuctionResult;
 import com.auction.domain.auction.repository.AuctionItemRepository;
+import com.auction.domain.auction.repository.AuctionResultRepository;
 import com.auction.domain.bid.repository.BidRepository;
 import com.auction.domain.category.entity.Category;
 import com.auction.domain.category.repository.CategoryRepository;
@@ -47,10 +49,11 @@ import java.util.List;
 public class AuctionService {
 
     // ── 주입 필드 ─────────────────────────────────────────────────────────────────
-    private final AuctionItemRepository auctionItemRepository;
-    private final CategoryRepository    categoryRepository;
-    private final BidRepository         bidRepository;
-    private final S3Service             s3Service;
+    private final AuctionItemRepository   auctionItemRepository;
+    private final AuctionResultRepository auctionResultRepository;
+    private final CategoryRepository      categoryRepository;
+    private final BidRepository           bidRepository;
+    private final S3Service               s3Service;
 
     private static final String S3_DIRECTORY = "auction-images"; // S3 저장 경로
 
@@ -178,6 +181,30 @@ public class AuctionService {
         }
 
         return AuctionResponse.from(item);
+    }
+
+    // ── 낙찰 결과 조회 ────────────────────────────────────────────────────────────
+
+    /**
+     * 경매 낙찰 결과를 조회한다.
+     *
+     * ENDED 상태의 경매에서만 의미가 있다.
+     * 유찰(입찰자 없이 종료)이면 null을 반환하고,
+     * 낙찰자가 있으면 AuctionResultResponse를 반환한다.
+     *
+     * @param auctionId 경매 ID
+     * @return 낙찰 결과, 유찰이면 null
+     */
+    public AuctionResultResponse getAuctionResult(Long auctionId) {
+        // 경매 존재 여부 확인
+        if (!auctionItemRepository.existsById(auctionId)) {
+            throw new CustomException(ErrorCode.AUCTION_NOT_FOUND);
+        }
+
+        // 낙찰 결과 조회 (유찰이면 Optional.empty())
+        return auctionResultRepository.findByAuctionItemId(auctionId)
+                .map(AuctionResultResponse::from)
+                .orElse(null);
     }
 
     // ── 경매 삭제 ─────────────────────────────────────────────────────────────────
